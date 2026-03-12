@@ -10,20 +10,20 @@
 using namespace std;
 using namespace crow;
 
-// === Валидация ===
-
 bool isValidName(const string& name) {
     return !name.empty() && name.find_first_not_of(" \t\n\r") != string::npos;
 }
 
 bool isValidPhone(const string& phone) {
     if (phone.empty()) return false;
-    
     int digits = 0;
-    for (char c : phone) {
-        if (isdigit(c)) digits++;
-        else if (c != '+' && c != '-' && c != ' ' && c != '(' && c != ')') 
+    for (unsigned char c : phone) {
+        if (std::isdigit(c)) {
+            digits++;
+        }
+        else if (c != '+' && c != '-' && c != ' ' && c != '(' && c != ')') {
             return false;
+        }
     }
     return digits >= 10;
 }
@@ -32,7 +32,6 @@ bool isValidNote(const string& note) {
     return note.size() <= 500;
 }
 
-// Хелпер для ошибок в JSON
 crow::response jsonError(int code, const string& message) {
     crow::json::wvalue err;
     err["error"] = message;
@@ -41,7 +40,6 @@ crow::response jsonError(int code, const string& message) {
     return res;
 }
 
-// Разделение ФИО
 void splitName(const string& fullName, string& lastName, string& firstName, string& patronymic) {
     istringstream iss(fullName);
     iss >> lastName;
@@ -52,25 +50,29 @@ void splitName(const string& fullName, string& lastName, string& firstName, stri
     }
 }
 
+bool getStringField(const crow::json::rvalue& json, const string& key, string& out) {
+    if (!json.has(key)) return false;
+    if (json[key].t() != crow::json::type::String) return false;
+    out = json[key].s().str();
+    return true;
+}
+
 int main() {
     SimpleApp app;
     string conn_string = "dbname=phone_book user=postgres password=postgres host=postgres port=5432";
 
-    // Главная страница
     CROW_ROUTE(app, "/")([]() {
         crow::response res;
         res.set_static_file_info("public/index.html");
         return res;
     });
 
-    // Картинка
     CROW_ROUTE(app, "/phone.jpg")([]() {
         crow::response res;
         res.set_static_file_info("public/phone.jpg");
         return res;
     });
 
-    // === GET /api/contacts ===
     CROW_ROUTE(app, "/api/contacts").methods(HTTPMethod::GET)([&conn_string]() {
         try {
             pqxx::connection c(conn_string);
@@ -100,7 +102,6 @@ int main() {
         }
     });
 
-    // === POST /api/contacts ===
     CROW_ROUTE(app, "/api/contacts").methods(HTTPMethod::POST)([&conn_string](const request& req) {
         auto body = json::load(req.body);
         if (!body) return jsonError(400, "Invalid JSON format");
@@ -108,16 +109,13 @@ int main() {
         if (!body.has("name") || !body.has("phone")) 
             return jsonError(400, "Missing required fields: name, phone");
         
-        // ✅ Конвертация r_string -> std::string
-        string name = std::string(body["name"].s());
-        string phone = std::string(body["phone"].s());
-        
-        // ✅ Безопасное получение опционального поля note
-        string note;
+        string name, phone, note;
+        if (!getStringField(body, "name", name)) 
+            return jsonError(400, "Invalid name field");
+        if (!getStringField(body, "phone", phone)) 
+            return jsonError(400, "Invalid phone field");
         if (body.has("note") && body["note"].t() != crow::json::type::Null) {
-            note = std::string(body["note"].s());
-        } else {
-            note = "";
+            note = body["note"].s().str();
         }
 
         if (!isValidName(name)) 
@@ -142,7 +140,6 @@ int main() {
         return crow::response(201);
     });
 
-    // === PUT /api/contacts/<int> ===
     CROW_ROUTE(app, "/api/contacts/<int>").methods(HTTPMethod::PUT)([&conn_string](const request& req, int id) {
         if (id <= 0) return jsonError(400, "Invalid contact ID");
 
@@ -152,15 +149,13 @@ int main() {
         if (!body.has("name") || !body.has("phone")) 
             return jsonError(400, "Missing required fields: name, phone");
         
-        // ✅ Конвертация r_string -> std::string (без .str())
-        string name = std::string(body["name"].s());
-        string phone = std::string(body["phone"].s());
-        
-        string note;
+        string name, phone, note;
+        if (!getStringField(body, "name", name)) 
+            return jsonError(400, "Invalid name field");
+        if (!getStringField(body, "phone", phone)) 
+            return jsonError(400, "Invalid phone field");
         if (body.has("note") && body["note"].t() != crow::json::type::Null) {
-            note = std::string(body["note"].s());
-        } else {
-            note = "";
+            note = body["note"].s().str();
         }
 
         if (!isValidName(name)) 
@@ -176,14 +171,11 @@ int main() {
         try {
             pqxx::connection c(conn_string);
             pqxx::work w(c);
-            
-            // ✅ Сохраняем результат для affected_rows()
             auto result = w.exec_params(
                 "UPDATE contacts SET last_name=$1, first_name=$2, patronymic=$3, phone_number=$4, note=$5 WHERE id=$6",
                 lastName, firstName, patronymic, phone, note, id);
             w.commit();
             
-            // ✅ Проверяем через result.affected_rows()
             if (result.affected_rows() == 0)
                 return jsonError(404, "Contact not found");
                 
@@ -193,28 +185,19 @@ int main() {
         return crow::response(200);
     });
 
-    // === DELETE /api/contacts/<int> ===
     CROW_ROUTE(app, "/api/contacts/<int>").methods(HTTPMethod::DELETE)([&conn_string](int id) {
         if (id <= 0) return jsonError(400, "Invalid contact ID");
 
         try {
             pqxx::connection c(conn_string);
             pqxx::work w(c);
-            
-            // ✅ Сохраняем результат для affected_rows() (опционально)
             auto result = w.exec_params("DELETE FROM contacts WHERE id=$1", id);
             w.commit();
-            
-            // Если нужно возвращать 404 при удалении несуществующего:
-            // if (result.affected_rows() == 0)
-            //     return jsonError(404, "Contact not found");
-            
         } catch (const exception &e) {
             return jsonError(500, "Database error: " + string(e.what()));
         }
         return crow::response(200);
     });
 
-    // ✅ Запуск в однопоточном режиме
     app.port(8080).run(); 
 }
