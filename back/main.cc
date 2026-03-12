@@ -135,14 +135,14 @@ int main() {
         if (!body.has("name") || !body.has("phone")) 
             return jsonError(400, "Missing required fields: name, phone");
         
-        string name = body["name"].s();
-        string phone = body["phone"].s();
-        string note = body.has("note") ? body["note"].s() : "";
+        string name = body["name"].s().str();  
+        string phone = body["phone"].s().str();
+        string note = body["note"].s().str(); 
 
         if (!isValidName(name)) 
             return jsonError(400, "Invalid name: cannot be empty");
         if (!isValidPhone(phone)) 
-            return jsonError(400, "Invalid phone: must contain at least 10 digits and only +,-,(),spaces");
+            return jsonError(400, "Invalid phone: must contain at least 10 digits");
         if (!isValidNote(note)) 
             return jsonError(400, "Invalid note: maximum 500 characters allowed");
 
@@ -152,11 +152,15 @@ int main() {
         try {
             pqxx::connection c(conn_string);
             pqxx::work w(c);
-            w.exec_params("UPDATE contacts SET last_name=$1, first_name=$2, patronymic=$3, phone_number=$4, note=$5 WHERE id=$6",
-                          lastName, firstName, patronymic, phone, note, id);
+            
+            auto result = w.exec_params(
+                "UPDATE contacts SET last_name=$1, first_name=$2, patronymic=$3, phone_number=$4, note=$5 WHERE id=$6",
+                lastName, firstName, patronymic, phone, note, id);
             w.commit();
-            if (w.conn().affected_rows() == 0)
+            
+            if (result.affected_rows() == 0)
                 return jsonError(404, "Contact not found");
+                
         } catch (const exception &e) {
             return jsonError(500, "Database error: " + string(e.what()));
         }
