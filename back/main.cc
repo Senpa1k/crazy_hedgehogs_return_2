@@ -28,9 +28,6 @@ bool isValidPhone(const string& phone) {
     return digits >= 10;
 }
 
-bool isValidNote(const string& note) {
-    return note.size() <= 500;
-}
 
 crow::response jsonError(int code, const string& message) {
     crow::json::wvalue err;
@@ -41,13 +38,25 @@ crow::response jsonError(int code, const string& message) {
 }
 
 void splitName(const string& fullName, string& lastName, string& firstName, string& patronymic) {
-    istringstream iss(fullName);
-    iss >> lastName;
-    if (!(iss >> firstName)) firstName = "-";
-    string temp;
-    while (iss >> temp) {
-        patronymic += (patronymic.empty() ? "" : " ") + temp;
+    vector<string> words;
+    string current;
+    
+    for (char c : fullName) {
+        if (isspace(c)) {
+            if (!current.empty()) {
+                words.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
     }
+    if (!current.empty()) words.push_back(current);
+    
+    lastName = words.size() > 0 ? words[0] : "";
+    firstName = words.size() > 1 ? words[1] : "-";
+    for (size_t i = 2; i < words.size(); i++)
+        patronymic += (patronymic.empty() ? "" : " ") + words[i];
 }
 
 bool getStringField(const crow::json::rvalue& json, const string& key, string& out) {
@@ -122,8 +131,6 @@ int main() {
             return jsonError(400, "Invalid name: cannot be empty");
         if (!isValidPhone(phone)) 
             return jsonError(400, "Invalid phone: must contain at least 10 digits and only +,-,(),spaces");
-        if (!isValidNote(note)) 
-            return jsonError(400, "Invalid note: maximum 500 characters allowed");
 
         string lastName, firstName, patronymic;
         splitName(name, lastName, firstName, patronymic);
@@ -162,8 +169,6 @@ int main() {
             return jsonError(400, "Invalid name: cannot be empty");
         if (!isValidPhone(phone)) 
             return jsonError(400, "Invalid phone: must contain at least 10 digits");
-        if (!isValidNote(note)) 
-            return jsonError(400, "Invalid note: maximum 500 characters allowed");
 
         string lastName, firstName, patronymic;
         splitName(name, lastName, firstName, patronymic);

@@ -7,8 +7,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - phonebook_net
 
 
   postgres:
@@ -28,8 +26,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - phonebook_net
+
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -42,11 +39,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - phonebook_net
 
 volumes:
   postgres_data:
 
-networks:
-  phonebook_net:

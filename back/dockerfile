@@ -2,12 +2,10 @@ FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y \
     g++ \
-    pkg-config \
     libpqxx-dev \
-    libpq-dev \
     libasio-dev \
     wget \
-    build-essential
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -16,7 +14,7 @@ RUN wget https://github.com/CrowCpp/Crow/releases/download/v1.2.0/crow_all.h -O 
 COPY main.cc ./
 COPY front ./public
 
-RUN g++ -std=c++17 -fPIC main.cc -o phonebook_server -lpqxx -lpq -lpthread $(pkg-config --cflags --libs libpqxx)
+RUN g++ -std=c++17 main.cc -o phonebook_server -lpqxx -lpq -lpthread
 
 EXPOSE 8080
 
