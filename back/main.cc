@@ -53,7 +53,7 @@ void splitName(const string& fullName, string& lastName, string& firstName, stri
 bool getStringField(const crow::json::rvalue& json, const string& key, string& out) {
     if (!json.has(key)) return false;
     if (json[key].t() != crow::json::type::String) return false;
-    out = json[key].s().str();
+    out = json[key].s();
     return true;
 }
 
@@ -115,7 +115,7 @@ int main() {
         if (!getStringField(body, "phone", phone)) 
             return jsonError(400, "Invalid phone field");
         if (body.has("note") && body["note"].t() != crow::json::type::Null) {
-            note = body["note"].s().str();
+            note = body["note"].s();
         }
 
         if (!isValidName(name)) 
@@ -155,7 +155,7 @@ int main() {
         if (!getStringField(body, "phone", phone)) 
             return jsonError(400, "Invalid phone field");
         if (body.has("note") && body["note"].t() != crow::json::type::Null) {
-            note = body["note"].s().str();
+            note = body["note"].s();
         }
 
         if (!isValidName(name)) 
